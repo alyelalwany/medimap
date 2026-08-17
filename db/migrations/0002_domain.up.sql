@@ -7,6 +7,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- pg_trgm powers fuzzy search on medicine and pharmacy names.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- Apply trigger to users (added in 0001 without one).
 CREATE TRIGGER users_set_updated_at
     BEFORE UPDATE ON users
@@ -50,7 +53,6 @@ CREATE TABLE medicines (
 );
 
 -- pg_trgm powers fuzzy search on medicine name / active ingredient.
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE INDEX medicines_name_trgm_idx ON medicines USING GIN (name gin_trgm_ops);
 CREATE INDEX medicines_ingredient_trgm_idx ON medicines USING GIN (active_ingredient gin_trgm_ops);
 
