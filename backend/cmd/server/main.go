@@ -18,6 +18,7 @@ import (
 	"github.com/alyelalwany/medimap/backend/internal/db"
 	"github.com/alyelalwany/medimap/backend/internal/handlers"
 	"github.com/alyelalwany/medimap/backend/internal/middleware"
+	"github.com/alyelalwany/medimap/backend/internal/models"
 )
 
 func main() {
@@ -63,6 +64,9 @@ func main() {
 		JWTTTL:    cfg.JWTTTL,
 		Secure:    cfg.Env == "production",
 	}
+	pharmacyH := &handlers.PharmacyHandler{Pool: pool}
+	searchH := &handlers.SearchHandler{Pool: pool}
+	savedH := &handlers.SavedHandler{Pool: pool}
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -73,11 +77,33 @@ func main() {
 		api.POST("/auth/register", authH.Register)
 		api.POST("/auth/login", authH.Login)
 
+		// Public search endpoints.
+		api.GET("/medicines/search", searchH.SearchMedicines)
+		api.GET("/pharmacies/search", searchH.SearchPharmacies)
+
 		authed := api.Group("")
 		authed.Use(middleware.Auth(cfg.JWTSecret))
 		{
 			authed.GET("/me", authH.Me)
 			authed.POST("/auth/logout", authH.Logout)
+
+			pharmacy := authed.Group("/pharmacies/me")
+			pharmacy.Use(middleware.RequireRole(models.RolePharmacy))
+			{
+				pharmacy.GET("", pharmacyH.GetMe)
+				pharmacy.PUT("", pharmacyH.UpsertMe)
+				pharmacy.GET("/stock", pharmacyH.ListMyStock)
+				pharmacy.PUT("/stock", pharmacyH.UpsertStock)
+				pharmacy.DELETE("/stock/:medicine_id", pharmacyH.DeleteStock)
+			}
+
+			consumer := authed.Group("/me/saved-medicines")
+			consumer.Use(middleware.RequireRole(models.RoleConsumer))
+			{
+				consumer.GET("", savedH.List)
+				consumer.POST("", savedH.Add)
+				consumer.DELETE("/:medicine_id", savedH.Remove)
+			}
 		}
 	}
 
