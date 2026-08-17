@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: medimap-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medimap
+      POSTGRES_PASSWORD: medimap_dev
+      POSTGRES_DB: medimap
+    ports:
+      - "5432:5432"
+    volumes:
+      - medimap_pgdata:/var/lib/postgresql/data
+      - ./db/migrations:/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medimap -d medimap"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  medimap_pgdata:
