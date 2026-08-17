@@ -46,6 +46,17 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	// Load seeds (idempotent) unless disabled.
+	if os.Getenv("SKIP_SEEDS") != "true" {
+		seedsDir := filepath.Join("..", "db", "seeds")
+		if v := os.Getenv("SEEDS_DIR"); v != "" {
+			seedsDir = v
+		}
+		if err := db.Seed(ctx, pool, seedsDir); err != nil {
+			log.Fatalf("seed: %v", err)
+		}
+	}
+
 	if cfg.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
