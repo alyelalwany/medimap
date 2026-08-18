@@ -1,21 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { MedicineSearchBar } from "@/components/MedicineSearchBar";
 import { PharmacyMap } from "@/components/PharmacyMap";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import type { Medicine, PharmacySearchResult } from "@/lib/types";
 
-// Default view: Berlin Mitte. Users can Use my location to override.
-const DEFAULT_CENTER = { lat: 52.52, lng: 13.405 };
+// Default view: Munich centre. Users can Use my location to override.
+const DEFAULT_CENTER = { lat: 48.1371, lng: 11.5754 };
 
 export default function Home() {
+  const { user } = useAuth();
   const [center, setCenter] = useState(DEFAULT_CENTER);
   const [selected, setSelected] = useState<Medicine | null>(null);
   const [results, setResults] = useState<PharmacySearchResult[]>([]);
   const [radiusKm, setRadiusKm] = useState(5);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [focus, setFocus] = useState<{ id: number; nonce: number } | null>(null);
+
+  useEffect(() => {
+    if (user?.role !== "consumer") {
+      setSavedIds(new Set());
+      return;
+    }
+    api
+      .listSaved()
+      .then((items) => setSavedIds(new Set(items.map((m) => m.id))))
+      .catch(() => setSavedIds(new Set()));
+  }, [user]);
 
   useEffect(() => {
     if (!selected) {
@@ -54,6 +71,44 @@ export default function Home() {
 
         <MedicineSearchBar onSelect={setSelected} />
 
+        {selected && (
+          <div className="flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-neutral-900">
+                {selected.name} · {selected.strength}
+              </div>
+              <div className="truncate text-xs text-neutral-500">
+                {selected.active_ingredient} · {selected.form}
+              </div>
+            </div>
+            <SaveButton
+              medicine={selected}
+              user={user}
+              saved={savedIds.has(selected.id)}
+              busy={saveBusy}
+              onToggle={async () => {
+                if (!user || user.role !== "consumer") return;
+                setSaveBusy(true);
+                try {
+                  if (savedIds.has(selected.id)) {
+                    await api.unsaveMedicine(selected.id);
+                    setSavedIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(selected.id);
+                      return next;
+                    });
+                  } else {
+                    await api.saveMedicine(selected.id);
+                    setSavedIds((prev) => new Set(prev).add(selected.id));
+                  }
+                } finally {
+                  setSaveBusy(false);
+                }
+              }}
+            />
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <label className="text-sm text-neutral-600">Radius</label>
           <select
@@ -89,33 +144,92 @@ export default function Home() {
             </div>
           )}
           <ul className="space-y-3">
-            {results.map((p) => (
-              <li
-                key={p.id}
-                className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm"
-              >
-                <div className="flex items-baseline justify-between">
-                  <div className="font-semibold text-neutral-900">{p.name}</div>
-                  <div className="text-xs text-neutral-500">
-                    {(p.distance_meters / 1000).toFixed(2)} km
+            {results.map((p) => {
+              const isFocused = focus?.id === p.id;
+              return (
+                <li
+                  key={p.id}
+                  onClick={() =>
+                    setFocus((f) => ({ id: p.id, nonce: (f?.nonce ?? 0) + 1 }))
+                  }
+                  className={`cursor-pointer rounded-lg border p-3 text-sm transition-colors ${
+                    isFocused
+                      ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200"
+                      : "border-neutral-200 bg-neutral-50 hover:border-emerald-300 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex items-baseline justify-between">
+                    <div className="font-semibold text-neutral-900">{p.name}</div>
+                    <div className="text-xs text-neutral-500">
+                      {(p.distance_meters / 1000).toFixed(2)} km
+                    </div>
                   </div>
-                </div>
-                <div className="text-neutral-600">{p.address}</div>
-                <div className="mt-2 flex items-center gap-3 text-neutral-700">
-                  <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800">
-                    {p.quantity} in stock
-                  </span>
-                  {p.phone && <span>📞 {p.phone}</span>}
-                </div>
-              </li>
-            ))}
+                  <div className="text-neutral-600">{p.address}</div>
+                  <div className="mt-2 flex items-center gap-3 text-neutral-700">
+                    <span className="rounded-md bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800">
+                      {p.quantity} in stock
+                    </span>
+                    {p.phone && <span>📞 {p.phone}</span>}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </aside>
 
       <div className="min-h-[400px] flex-1 md:min-h-0">
-        <PharmacyMap center={center} pharmacies={results} onCenterChange={setCenter} />
+        <PharmacyMap
+          center={center}
+          pharmacies={results}
+          onCenterChange={setCenter}
+          focusRequest={focus}
+        />
       </div>
     </div>
+  );
+}
+
+function SaveButton({
+  medicine,
+  user,
+  saved,
+  busy,
+  onToggle,
+}: {
+  medicine: Medicine;
+  user: { role: string } | null;
+  saved: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  if (!user) {
+    return (
+      <Link
+        href="/login"
+        className="ml-3 shrink-0 rounded-md border border-neutral-300 px-3 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
+      >
+        Log in to save
+      </Link>
+    );
+  }
+  if (user.role !== "consumer") {
+    return null;
+  }
+  return (
+    <button
+      onClick={onToggle}
+      disabled={busy}
+      title={saved ? "Remove from saved medicines" : "Save this medicine to your profile"}
+      className={`ml-3 shrink-0 rounded-md border px-3 py-1 text-xs font-medium disabled:opacity-60 ${
+        saved
+          ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+          : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-100"
+      }`}
+      aria-pressed={saved}
+    >
+      {saved ? "✓ Saved" : "Save"}
+      <span className="sr-only"> {medicine.name}</span>
+    </button>
   );
 }
