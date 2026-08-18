@@ -110,6 +110,7 @@ export function PharmacyMap({ center, pharmacies, focusRequest }: Props) {
         .setLngLat([p.lng, p.lat])
         .setPopup(popup)
         .addTo(m);
+      marker.getElement().style.cursor = "pointer";
       markersRef.current.set(p.id, marker);
     });
   }, [pharmacies]);
