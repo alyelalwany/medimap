@@ -10,6 +10,7 @@ type Props = {
   center: { lat: number; lng: number };
   pharmacies: PharmacySearchResult[];
   focusRequest?: { id: number; nonce: number } | null;
+  onSelect?: (id: number) => void;
 };
 
 // OpenStreetMap raster tiles (no API key required). Fine for dev / MVP.
@@ -36,11 +37,16 @@ function hasWebGL(): boolean {
   }
 }
 
-export function PharmacyMap({ center, pharmacies, focusRequest }: Props) {
+export function PharmacyMap({ center, pharmacies, focusRequest, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markersRef = useRef<Map<number, Marker>>(new Map());
+  const onSelectRef = useRef(onSelect);
   const [webglOk, setWebglOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
 
   useEffect(() => {
     setWebglOk(hasWebGL());
@@ -110,7 +116,11 @@ export function PharmacyMap({ center, pharmacies, focusRequest }: Props) {
         .setLngLat([p.lng, p.lat])
         .setPopup(popup)
         .addTo(m);
-      marker.getElement().style.cursor = "pointer";
+      const el = marker.getElement();
+      el.style.cursor = "pointer";
+      el.addEventListener("click", () => {
+        onSelectRef.current?.(p.id);
+      });
       markersRef.current.set(p.id, marker);
     });
   }, [pharmacies]);
@@ -130,9 +140,17 @@ export function PharmacyMap({ center, pharmacies, focusRequest }: Props) {
       const pop = mk.getPopup();
       if (pop && pop.isOpen()) mk.togglePopup();
     });
-    m.flyTo({ center: [p.lng, p.lat], zoom: Math.max(m.getZoom(), 15), speed: 1.4 });
-    const popup = marker.getPopup();
-    if (popup && !popup.isOpen()) marker.togglePopup();
+    const openPopup = () => {
+      const popup = marker.getPopup();
+      if (popup && !popup.isOpen()) marker.togglePopup();
+    };
+    m.once("moveend", openPopup);
+    m.flyTo({
+      center: [p.lng, p.lat],
+      zoom: Math.max(m.getZoom(), 15),
+      speed: 1.4,
+      essential: true,
+    });
   }, [focusRequest, pharmacies]);
 
   if (webglOk === false) {

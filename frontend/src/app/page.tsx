@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MedicineSearchBar } from "@/components/MedicineSearchBar";
 import { PharmacyMap } from "@/components/PharmacyMap";
@@ -27,6 +27,13 @@ export default function Home() {
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const [saveBusy, setSaveBusy] = useState(false);
   const [focus, setFocus] = useState<{ id: number; nonce: number } | null>(null);
+  const itemRefs = useRef<Map<number, HTMLLIElement>>(new Map());
+
+  useEffect(() => {
+    if (!focus) return;
+    const el = itemRefs.current.get(focus.id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [focus]);
 
   useEffect(() => {
     if (user?.role !== "consumer") {
@@ -65,8 +72,8 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-1 flex-col md:flex-row">
-      <aside className="flex w-full flex-col gap-4 border-r border-neutral-200 bg-white p-6 md:w-[420px]">
+    <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+      <aside className="flex w-full min-h-0 flex-col gap-4 border-r border-neutral-200 bg-white p-6 md:w-[420px]">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Find a medicine near you</h1>
           <p className="mt-1 text-sm text-neutral-600">
@@ -135,7 +142,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           {!selected && (
             <div className="rounded-lg border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
               Start by searching a medicine above.
@@ -154,6 +161,10 @@ export default function Home() {
               return (
                 <li
                   key={p.id}
+                  ref={(el) => {
+                    if (el) itemRefs.current.set(p.id, el);
+                    else itemRefs.current.delete(p.id);
+                  }}
                   onClick={() =>
                     setFocus((f) => ({ id: p.id, nonce: (f?.nonce ?? 0) + 1 }))
                   }
@@ -188,6 +199,9 @@ export default function Home() {
           center={searchOrigin}
           pharmacies={results}
           focusRequest={focus}
+          onSelect={(id) =>
+            setFocus((f) => ({ id, nonce: (f?.nonce ?? 0) + 1 }))
+          }
         />
       </div>
     </div>
