@@ -106,7 +106,7 @@ export function PharmacyMap({ center, pharmacies, focusRequest, onSelect }: Prop
         <div style="font-family: system-ui; min-width: 220px; color: #000;">
           <div style="font-weight: 600; font-size: 15px;">${escapeHTML(p.name)}</div>
           <div style="margin-top: 2px;">${escapeHTML(p.address)}</div>
-          <div style="margin-top: 6px; font-weight: 600;">${p.quantity} in stock</div>
+          <div style="margin-top: 6px; font-weight: 600; color: #065f46;">${p.quantity} in stock</div>
           <div style="font-size: 12px;">${(p.distance_meters / 1000).toFixed(2)} km away</div>
           ${p.phone ? `<div style="margin-top: 6px;">📞 ${escapeHTML(p.phone)}</div>` : ""}
           ${p.website ? `<div>🌐 <a href="${escapeHTML(p.website)}" target="_blank" rel="noreferrer" style="color: #000; text-decoration: underline;">${escapeHTML(p.website)}</a></div>` : ""}
