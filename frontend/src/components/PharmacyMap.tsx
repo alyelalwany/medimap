@@ -123,6 +123,12 @@ export function PharmacyMap({ center, pharmacies, focusRequest }: Props) {
     const p = pharmacies.find((x) => x.id === focusRequest.id);
     const marker = markersRef.current.get(focusRequest.id);
     if (!p || !marker) return;
+    // Close any other open popups so only the focused one is visible.
+    markersRef.current.forEach((mk, id) => {
+      if (id === focusRequest.id) return;
+      const pop = mk.getPopup();
+      if (pop && pop.isOpen()) mk.togglePopup();
+    });
     m.flyTo({ center: [p.lng, p.lat], zoom: Math.max(m.getZoom(), 15), speed: 1.4 });
     const popup = marker.getPopup();
     if (popup && !popup.isOpen()) marker.togglePopup();
