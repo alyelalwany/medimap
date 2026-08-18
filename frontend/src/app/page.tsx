@@ -13,7 +13,12 @@ const DEFAULT_CENTER = { lat: 48.1371, lng: 11.5754 };
 
 export default function Home() {
   const { user } = useAuth();
-  const [center, setCenter] = useState(DEFAULT_CENTER);
+  // `searchOrigin` is the point used for the pharmacy query. It only changes
+  // when the user asks it to (default, "Use my location", or a future
+  // "search here" button). The map's own pan/zoom does NOT change it —
+  // otherwise every map move (including our own flyTo) would refetch and
+  // rebuild markers, causing a visible flicker.
+  const [searchOrigin, setSearchOrigin] = useState(DEFAULT_CENTER);
   const [selected, setSelected] = useState<Medicine | null>(null);
   const [results, setResults] = useState<PharmacySearchResult[]>([]);
   const [radiusKm, setRadiusKm] = useState(5);
@@ -42,16 +47,16 @@ export default function Home() {
     setBusy(true);
     setError(null);
     api
-      .searchPharmacies(selected.id, center.lat, center.lng, radiusKm)
+      .searchPharmacies(selected.id, searchOrigin.lat, searchOrigin.lng, radiusKm)
       .then(setResults)
       .catch((e: Error) => setError(e.message))
       .finally(() => setBusy(false));
-  }, [selected, center.lat, center.lng, radiusKm]);
+  }, [selected, searchOrigin.lat, searchOrigin.lng, radiusKm]);
 
   function useMyLocation() {
     if (!("geolocation" in navigator)) return;
     navigator.geolocation.getCurrentPosition(
-      (pos) => setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => setSearchOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       () => {
         /* keep default */
       },
@@ -180,9 +185,8 @@ export default function Home() {
 
       <div className="min-h-[400px] flex-1 md:min-h-0">
         <PharmacyMap
-          center={center}
+          center={searchOrigin}
           pharmacies={results}
-          onCenterChange={setCenter}
           focusRequest={focus}
         />
       </div>

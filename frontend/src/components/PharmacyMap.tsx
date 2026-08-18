@@ -9,7 +9,6 @@ import type { PharmacySearchResult } from "@/lib/types";
 type Props = {
   center: { lat: number; lng: number };
   pharmacies: PharmacySearchResult[];
-  onCenterChange?: (c: { lat: number; lng: number }) => void;
   focusRequest?: { id: number; nonce: number } | null;
 };
 
@@ -37,7 +36,7 @@ function hasWebGL(): boolean {
   }
 }
 
-export function PharmacyMap({ center, pharmacies, onCenterChange, focusRequest }: Props) {
+export function PharmacyMap({ center, pharmacies, focusRequest }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MLMap | null>(null);
   const markersRef = useRef<Map<number, Marker>>(new Map());
@@ -68,11 +67,6 @@ export function PharmacyMap({ center, pharmacies, onCenterChange, focusRequest }
       if (msg.toLowerCase().includes("webgl")) setWebglOk(false);
     });
     m.addControl(new NavigationControl({ visualizePitch: false }), "top-right");
-    m.on("moveend", () => {
-      if (!onCenterChange) return;
-      const c = m.getCenter();
-      onCenterChange({ lat: c.lat, lng: c.lng });
-    });
     mapRef.current = m;
     return () => {
       m.remove();
@@ -88,13 +82,20 @@ export function PharmacyMap({ center, pharmacies, onCenterChange, focusRequest }
     m.easeTo({ center: [center.lng, center.lat] });
   }, [center.lat, center.lng]);
 
-  // Rebuild markers on pharmacies change.
+  // Reconcile markers when pharmacies change. Only add/remove diffs so the
+  // markers for pharmacies that stayed in the results don't flicker.
   useEffect(() => {
     const m = mapRef.current;
     if (!m) return;
-    markersRef.current.forEach((mk) => mk.remove());
-    markersRef.current.clear();
+    const nextIds = new Set(pharmacies.map((p) => p.id));
+    for (const [id, mk] of markersRef.current) {
+      if (!nextIds.has(id)) {
+        mk.remove();
+        markersRef.current.delete(id);
+      }
+    }
     pharmacies.forEach((p) => {
+      if (markersRef.current.has(p.id)) return;
       const popup = new Popup({ offset: 24 }).setHTML(`
         <div style="font-family: system-ui; min-width: 220px; color: #000;">
           <div style="font-weight: 600; font-size: 15px;">${escapeHTML(p.name)}</div>
