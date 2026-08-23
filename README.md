@@ -2,6 +2,8 @@
 
 Real-time medicine availability map. Consumers search for a medicine and see nearby pharmacies that currently have it in stock. Pharmacies maintain their inventory through a dashboard.
 
+**Live demo (read-only):** [medimap.elalwany.de](https://medimap.elalwany.de)
+
 ![medimap map view](docs/img/map.png)
 
 ## Layout
@@ -52,3 +54,7 @@ Backend serves on `:8081` (Docker Desktop occupies `:8080` on macOS). Frontend r
 
 - **Consumer** — searches medicines, sees them on a map, saves medicines to profile for quick re-search
 - **Pharmacy** — logs in, manages its own stock (name, address, hours, medicine inventory with quantities)
+
+## Deployment
+
+Deploys to a Gardener Kubernetes shoot as a read-only demo. See [`deploy/README.md`](deploy/README.md) for the full runbook (image build/push, kubectl apply, DNS, TLS).
