@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { READ_ONLY } from "@/lib/mode";
 
 export function Header() {
   const { user, loading, logout } = useAuth();
@@ -12,7 +13,7 @@ export function Header() {
         medimap
       </Link>
       <nav className="flex items-center gap-4 text-sm">
-        {!loading && !user && (
+        {!READ_ONLY && !loading && !user && (
           <>
             <Link href="/login" className="text-neutral-700 hover:text-emerald-700">
               Log in
