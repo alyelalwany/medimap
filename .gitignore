@@ -47,3 +47,6 @@ yarn-error.log*
 # Local env overrides
 *.local
 .env.*.local
+
+# k8s deployment secrets (rendered from secrets.example.yaml)
+/deploy/k8s/secrets.yaml
