@@ -14,6 +14,7 @@ type Config struct {
 	JWTSecret   string
 	JWTTTL      time.Duration
 	CORSOrigin  string
+	ReadOnly    bool
 }
 
 func Load() (*Config, error) {
@@ -23,6 +24,7 @@ func Load() (*Config, error) {
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		JWTSecret:   os.Getenv("JWT_SECRET"),
 		CORSOrigin:  getEnv("CORS_ORIGIN", "http://localhost:3000"),
+		ReadOnly:    os.Getenv("READ_ONLY") == "true",
 	}
 
 	if cfg.DatabaseURL == "" {
