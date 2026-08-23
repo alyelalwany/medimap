@@ -6,7 +6,7 @@ Deploys medimap as a **read-only public demo** at `https://medimap.elalwany.de`.
 
 - **Cluster**: Gardener shoot `elalwany` (project `i550774`, canary), AWS eu-west-1, 1 worker node.
 - **DNS**: `elalwany.de` at Hostinger. CNAME added manually after first apply.
-- **TLS**: Let's Encrypt via Gardener's `cert.gardener.cloud/Certificate` extension (`http01` challenge).
+- **TLS**: Let's Encrypt via [jetstack cert-manager](https://cert-manager.io/), `http01` challenge solved by the nginx ingress. Gardener's `cert.gardener.cloud` extension needed `dns01` which Hostinger doesn't support as a Gardener DNS provider, so we run our own cert-manager instead.
 - **Registry**: `docker.io/alyelalwany/medimap-{backend,frontend}` (public).
 
 ## One-time prerequisites
@@ -27,6 +27,24 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
   --namespace ingress-nginx --create-namespace \
   --set controller.service.type=LoadBalancer
 ```
+
+### Install cert-manager (once per cluster)
+
+Gardener flags cert-manager's admission webhook as unreachable from the seed's kube-apiserver
+unless the webhook uses the node's host network. Install with `webhook.hostNetwork=true`:
+
+```bash
+helm repo add jetstack https://charts.jetstack.io
+helm repo update jetstack
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager --create-namespace \
+  --set crds.enabled=true \
+  --set webhook.hostNetwork=true \
+  --set webhook.securePort=10260
+```
+
+If Gardener auto-remediates the webhook first (edits `timeoutSeconds`), Helm upgrades will hit
+a field-manager conflict. Use `--force-conflicts` on subsequent `helm upgrade` calls.
 
 Watch for the ELB hostname:
 
@@ -107,23 +125,25 @@ dig +short medimap.elalwany.de
 
 ## TLS
 
-Gardener's cert controller sees the `Certificate` resource and starts an `http01` challenge. It needs `medimap.elalwany.de` to resolve to the ELB and the ingress to be routing `/.well-known/acme-challenge/*` through — the ingress does this automatically. Check status:
+cert-manager sees the `Ingress`'s `cert-manager.io/cluster-issuer: letsencrypt-prod` annotation
+and the `Certificate` resource, then runs an `http01` challenge through the ingress. Check status:
 
 ```bash
-kubectl -n medimap get certificate medimap-tls
-# STATE column should transition Pending → Ready (a few minutes after DNS resolves)
+kubectl -n medimap get certificate.cert-manager.io medimap-tls
+# READY column should be True within a couple of minutes after DNS resolves
 ```
 
-If it stays `Pending`, describe it:
+If it stays `False`, describe it:
 
 ```bash
-kubectl -n medimap describe certificate medimap-tls
+kubectl -n medimap describe certificate.cert-manager.io medimap-tls
+kubectl -n medimap get challenges.acme.cert-manager.io
 ```
 
 Common causes:
-- DNS not propagated yet (wait).
-- CNAME points somewhere wrong.
+- DNS not propagated yet (wait; verify with `dig +short medimap.elalwany.de`).
 - Rate-limited by Let's Encrypt (wait an hour, don't retry aggressively).
+- ingress-nginx not routing `/.well-known/acme-challenge/*` — check the controller logs.
 
 ## Verify
 
