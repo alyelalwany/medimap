@@ -3,6 +3,8 @@ kind: Ingress
 metadata:
   name: medimap
   namespace: medimap
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   ingressClassName: nginx
   tls:
